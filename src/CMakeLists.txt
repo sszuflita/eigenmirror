@@ -21,3 +21,13 @@ target_link_libraries(Stream
 	${Boost_SYSTEM_LIBRARY}
 	${Boost_REGEX_LIBRARY})
 
+add_executable( mean mean.cpp)
+target_link_libraries(mean
+	${OpenCV_LIBS}
+	${Boost_FILESYSTEM_LIBRARY}
+	${Boost_SYSTEM_LIBRARY}
+	${Boost_REGEX_LIBRARY})
+
+
+add_executable( DisplayImage DisplayImage.cpp)
+target_link_libraries( DisplayImage ${OpenCV_LIBS})

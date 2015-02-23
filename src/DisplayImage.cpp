@@ -150,6 +150,9 @@ int main(int argc, const char *argv[]) {
     Mat eigenvalues = model->getMat("eigenvalues");
     // And we can do the same to display the Eigenvectors (read Eigenfaces):
     Mat W = model->getMat("eigenvectors");
+
+    cout << W.size() << endl; 
+
     // Get the sample mean from the training data
     Mat mean = model->getMat("mean");
     // Display or save:

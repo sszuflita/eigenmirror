@@ -4,3 +4,8 @@ donut
 output
 target
 CMakeFiles
+.DS_Store
+all_images
+build
+src/CMakeCache.txt
+*~

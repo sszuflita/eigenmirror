@@ -50,14 +50,18 @@ static Mat load_mean(const string& mean_file) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    cout << "usage: " << argv[0] << " <input_dir> <mean_file> <num_eigenfaces>" << endl;
+  if (argc != 5) {
+    cout << "usage: " << argv[0] << " <input_dir> <mean_file> <num_eigenfaces> <haar_file>" << endl;
     exit(1);
   }
 
   string input_dir = string(argv[1]);
   string mean_file = string(argv[2]);
   int num_eigenfaces = atoi(argv[3]);
+  string haar_file = string(argv[4]);
+
+  CascadeClassifier haar_cascade;
+  haar_cascade.load(haar_file);
 
   cout << "Loading images" << endl;
   vector<Mat> images;
@@ -66,7 +70,6 @@ int main(int argc, char* argv[]) {
     load_images(input_dir, images);
   } catch (cv::Exception& e) {
     cerr << "Error opening dir \"" << input_dir << "\". Reason: " << e.msg << endl;
-// nothing more we can do
     exit(1);
   }
   cout << "Done loading images" << endl;
@@ -98,10 +101,9 @@ int main(int argc, char* argv[]) {
 
   int frameCount = 0;
   while (1) {
-    cout << "Frame count:\t" << frameCount << endl;
     frameCount++;
 
-    Mat frame;
+    Mat frame, gray_frame;
 
     bool bSuccess = cap.read(frame); // read a new frame from video
 
@@ -110,27 +112,31 @@ int main(int argc, char* argv[]) {
       break;
     }
 
-    cv::Rect face_rect((dWidth - width) / 2, (dHeight - height) / 2, width, height);
-    rectangle(frame, face_rect, CV_RGB(0, 255, 255));
+    cvtColor(frame, gray_frame, CV_BGR2GRAY);
 
-    Mat face = frame(face_rect).clone();
-    cvtColor( face, face, CV_BGR2GRAY );
+    vector< Rect_<int> > faces;
+    haar_cascade.detectMultiScale(gray_frame, faces);
+    for (int i = 0; i < faces.size(); i++) {
+      Rect face_i = faces[i];
+
+      Mat face = gray_frame(face_i);
+
+      Mat face_resized;
+      cv::resize(face, face_resized, Size(width, height), 1.0, 1.0, INTER_CUBIC);
+      rectangle(frame, face_i, CV_RGB(0, 255, 0), 1);
+      mean.convertTo(mean, CV_32FC1);
+      W.convertTo(W, CV_32FC1);
+      Mat projection = subspaceProject(W, mean, face_resized.reshape(1, 1));
+      Mat reconstruction = subspaceReconstruct(W, mean, projection);
+      reconstruction = norm_0_255(reconstruction.reshape(1, height));
+      imshow("EigenFeed", reconstruction);
+    }
 
 
-    W.convertTo(W, CV_32FC1);
-
-    face.convertTo(face, CV_32FC1);
 
 
-    mean.convertTo(mean, CV_32FC1);
-    Mat projection = subspaceProject(W, mean, face.reshape(1, 1));
-    cout << face << endl;
-    Mat reconstruction = subspaceReconstruct(W, mean, projection);
-    reconstruction = norm_0_255(reconstruction.reshape(1, height));
 
     imshow("RawFeed", frame);
-    imshow("EigenFeed", reconstruction);
-
 
     if (waitKey(30) == 27) {
       cout << "esc key is pressed by user" << endl;

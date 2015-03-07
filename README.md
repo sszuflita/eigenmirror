@@ -20,3 +20,4 @@ e) include haar face detection
 TODO:
 a) experiment with larger face database / preprocessing of faces
 b) experiment with display
+c) experiment with face sliders

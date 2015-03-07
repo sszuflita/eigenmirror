@@ -98,6 +98,7 @@ int main(int argc, char* argv[]) {
 
   namedWindow("RawFeed",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
   namedWindow("EigenFeed", CV_WINDOW_AUTOSIZE);
+  namedWindow("FoundFace", CV_WINDOW_AUTOSIZE);
 
   int frameCount = 0;
   while (1) {
@@ -116,20 +117,51 @@ int main(int argc, char* argv[]) {
 
     vector< Rect_<int> > faces;
     haar_cascade.detectMultiScale(gray_frame, faces);
-    for (int i = 0; i < faces.size(); i++) {
-      Rect face_i = faces[i];
 
-      Mat face = gray_frame(face_i);
+    if (faces.size() > 0) {
 
+      Rect face_rect = faces[0];
+
+      for (int i = 1; i < faces.size(); i++) {
+        Rect face_i = faces[i];
+
+        if (face_rect.area() < face_i.area()) {
+          face_rect = face_i;
+        }
+      }
+
+
+      double wfactor = .6;
+      face_rect.x += (1 - wfactor) * face_rect.width / 2;
+      face_rect.width *= wfactor;
+
+      double hfactor = .2;
+      face_rect.y += face_rect.height * hfactor;
+      face_rect.height *= (1 - hfactor);
+
+      Mat face = gray_frame(face_rect);
       Mat face_resized;
       cv::resize(face, face_resized, Size(width, height), 1.0, 1.0, INTER_CUBIC);
-      rectangle(frame, face_i, CV_RGB(0, 255, 0), 1);
+      rectangle(frame, face_rect, CV_RGB(0, 255, 0), 1);
+
+      face_resized.convertTo(face_resized, CV_32FC1);
       mean.convertTo(mean, CV_32FC1);
       W.convertTo(W, CV_32FC1);
+
       Mat projection = subspaceProject(W, mean, face_resized.reshape(1, 1));
       Mat reconstruction = subspaceReconstruct(W, mean, projection);
+
       reconstruction = norm_0_255(reconstruction.reshape(1, height));
-      imshow("EigenFeed", reconstruction);
+      reconstruction.convertTo(reconstruction, CV_8UC1);
+
+      mean.convertTo(mean, CV_8UC1);
+
+      face_resized.convertTo(face_resized, CV_8UC1);
+
+      imshow("FoundFace", face_resized);
+      imshow("EigenFeed", reconstruction.reshape(1, height));
+    } else {
+      cout << "No faces found :(" << endl;
     }
 
 

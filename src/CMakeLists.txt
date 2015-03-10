@@ -28,6 +28,13 @@ target_link_libraries(mean
 	${Boost_SYSTEM_LIBRARY}
 	${Boost_REGEX_LIBRARY})
 
+add_executable( crop crop.cpp)
+target_link_libraries(crop
+	${OpenCV_LIBS}
+	${Boost_FILESYSTEM_LIBRARY}
+	${Boost_SYSTEM_LIBRARY}
+	${Boost_REGEX_LIBRARY})
+
 
 add_executable( DisplayImage DisplayImage.cpp)
 target_link_libraries( DisplayImage ${OpenCV_LIBS})

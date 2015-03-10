@@ -14,10 +14,13 @@ using namespace cv;
 using namespace std;
 namespace fs = boost::filesystem; 
 
+int eigen_width, eigen_height, eigen_area;
 int top_half_factor, bottom_half_factor, width_factor;
 const int max_factor = 200;
 Rect face_rect;
-Mat clean_frame;
+Mat clean_frame, W, image_mean;
+Mat reconstruction;
+
 
 static int find_face(CascadeClassifier& haar_cascade, Mat& gray_frame) {
   vector< Rect_<int> > faces;
@@ -42,11 +45,13 @@ static int find_face(CascadeClassifier& haar_cascade, Mat& gray_frame) {
   return 1;
 }
 
-static void load_images(const string& dirname, vector<Mat>& images) {
+static void load_images(const string& dirname, vector<Mat>& images, int num_eigenfaces) {
   fs::path dir(dirname);
   fs::directory_iterator it(dir), eod;
+  int n = 0;
   BOOST_FOREACH(fs::path const &p, std::make_pair(it, eod)) {
-    if (is_regular_file(p)) {
+    if (is_regular_file(p) && n < num_eigenfaces) {
+      n++;
       cout << p << endl;
       Mat image = imread(p.c_str(), 0);
       images.push_back(image);
@@ -71,6 +76,32 @@ static Mat norm_0_255(InputArray _src) {
     }
     return dst;
 }
+
+static void compute_eigenfaces(Mat face) {
+  Mat face_resized;
+  cv::resize(face, face_resized, Size(eigen_width, eigen_height), 1.0, 1.0, INTER_CUBIC);
+
+  imshow("FoundFace", face_resized);
+
+  face_resized.convertTo(face_resized, CV_32FC1);
+  image_mean.convertTo(image_mean, CV_32FC1);
+  W.convertTo(W, CV_32FC1);
+
+  for (int num_components = 5; num_components < W.cols; num_components += 5) {
+    cout << format("EigenFeed%d", num_components) << endl;
+    Mat evs = Mat(W, Range::all(), Range(0, num_components));
+    Mat projection = subspaceProject(evs, image_mean, face_resized.reshape(1, 1));
+    reconstruction = subspaceReconstruct(evs, image_mean, projection);
+    reconstruction = reconstruction.reshape(1, eigen_height);
+    reconstruction += image_mean;
+    reconstruction.convertTo(reconstruction, CV_8UC1);
+
+
+    imshow(format("EigenFeed%d", num_components), reconstruction);
+  }
+}
+
+
 
 /**
  * @function on_trackbar
@@ -97,6 +128,17 @@ void on_trackbar( int, void* ) {
   clean_frame.copyTo(dirty_frame);
 
   rectangle(dirty_frame, face_rect_modified, CV_RGB(0, 255, 0), 1);
+
+
+  Mat face = clean_frame(face_rect_modified);
+
+  cvtColor(face, face, CV_BGR2GRAY);
+
+  compute_eigenfaces(face);
+
+  cv::resize(reconstruction, reconstruction,
+    Size(face_rect_modified.width, face_rect_modified.height), 1.0, 1.0, INTER_CUBIC);
+
   imshow("RawFeed", dirty_frame);
 }
 
@@ -123,20 +165,23 @@ int main(int argc, char* argv[]) {
   vector<Mat> images;
 
   try {
-    load_images(input_dir, images);
+    load_images(input_dir, images, num_eigenfaces);
   } catch (cv::Exception& e) {
     cerr << "Error opening dir \"" << input_dir << "\". Reason: " << e.msg << endl;
     exit(1);
   }
   cout << "Done loading images" << endl;
 
-  int eigen_height = images[0].rows;
-  int eigen_width = images[0].cols;
-  int eigen_area = eigen_width * eigen_height;
+  eigen_height = images[0].rows;
+  eigen_width = images[0].cols;
+  eigen_area = eigen_width * eigen_height;
 
-  Mat mean = load_mean(mean_file);
+  image_mean = load_mean(mean_file);
 
-  Mat W(eigen_area, num_eigenfaces, images[0].type());
+  cout << "Loaded mean" << endl;
+
+  Mat tmp(eigen_area, num_eigenfaces, images[0].type());
+  W = tmp;
 
   for (int i = 0; i < num_eigenfaces; i++) {
     Mat col = images[i].reshape(1, eigen_area);
@@ -154,7 +199,12 @@ int main(int argc, char* argv[]) {
   double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT); //get the height of frames of the video
 
   namedWindow("RawFeed",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
-  namedWindow("EigenFeed", CV_WINDOW_AUTOSIZE);
+
+  for (int num_components = 5; num_components < W.cols; num_components += 5) {
+    cout << format("EigenFeed%d", num_components) << endl;
+    namedWindow(format("EigenFeed%d", num_components));
+  }
+
   namedWindow("FoundFace", CV_WINDOW_AUTOSIZE);
 
   Mat gray_frame;
@@ -196,26 +246,14 @@ int main(int argc, char* argv[]) {
   }
 
   Mat face = gray_frame(face_rect);
+
+
   Mat face_resized;
   cv::resize(face, face_resized, Size(eigen_width, eigen_height), 1.0, 1.0, INTER_CUBIC);
 
-  face_resized.convertTo(face_resized, CV_32FC1);
-  mean.convertTo(mean, CV_32FC1);
-  W.convertTo(W, CV_32FC1);
-
-  /*Mat projection = subspaceProject(W, mean, face_resized.reshape(1, 1));
-  Mat reconstruction = subspaceReconstruct(W, mean, projection);
-
-  reconstruction = norm_0_255(reconstruction.reshape(1, height));
-  reconstruction.convertTo(reconstruction, CV_8UC1);
-
-  mean.convertTo(mean, CV_8UC1);*/
-
-  face_resized.convertTo(face_resized, CV_8UC1);
-
+  compute_eigenfaces(face);
   imshow("RawFeed", clean_frame);
-  imshow("FoundFace", face_resized);
-//  imshow("EigenFeed", reconstruction.reshape(1, height));
+
   waitKey(0);
   return 0;
 }

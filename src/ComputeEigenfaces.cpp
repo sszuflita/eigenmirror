@@ -37,9 +37,10 @@ static void load_images(const string& dirname, vector<Mat>& images, vector<int>&
   fs::path dir(dirname);
   fs::directory_iterator it(dir), eod;
   BOOST_FOREACH(fs::path const &p, std::make_pair(it, eod)) {
+    cout << p << endl;
     if (is_regular_file(p)) {
       Mat image = imread(p.c_str(), 0);
-      if (image.cols != 168 && image.cols != 192) {
+      if (image.cols != 64 && image.cols != 64) {
 	cout << p << endl;
 	cout << image.size() << endl;
       }
@@ -103,6 +104,7 @@ int main(int argc, const char *argv[]) {
     int width = images[0].cols;
 
     Ptr<FaceRecognizer> model = createEigenFaceRecognizer();
+    cout << "Beginning training" << endl;
     model->train(images, labels);
 
     Mat eigenvalues = model->getMat("eigenvalues");

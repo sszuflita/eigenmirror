@@ -18,6 +18,7 @@ static void load_images(const string& dirname, vector<Mat>& images) {
   fs::path dir(dirname);
   fs::directory_iterator it(dir), eod;
   BOOST_FOREACH(fs::path const &p, std::make_pair(it, eod)) {
+    cout << p << endl;
     if (is_regular_file(p)) {
       Mat image = imread(p.c_str(), 0);
       images.push_back(image);
